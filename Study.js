@@ -1,4 +1,5 @@
 "auto";
+console.setTitle("科技!解放!","#ff11ee00",20);
 auto.waitFor();
 importClass(android.database.sqlite.SQLiteDatabase);
 importClass(java.net.HttpURLConnection);
@@ -42,6 +43,8 @@ let ocr;
 var token;
 var ttt;
 var question_list = [];
+var thread1_i = 0;
+var thread1_ii = 0;
 var status = false;//是否暂停
 while (status) { console.log("主线程暂停中"); sleep(750); };
 /**
@@ -50,11 +53,14 @@ while (status) { console.log("主线程暂停中"); sleep(750); };
 var thread1 = threads.start(function () {
     console.info("反滑块验证已启动");
     while (true) {
-        if (text('访问异常').exists()) {
+        if (textContains('访问异常').exists()) {
+            console.hide();
+            toastLog("隐藏控制台");
+            thread1_i++;
             status = true;
             console.error("人机验证！");
-            text("向右滑动验证").waitFor();
-            var hk_t = className("android.view.View").text("向右滑动验证").findOne().parent().parent().bounds();
+            textContains("向右滑动验证").waitFor();
+            var hk_t = textContains("向右滑动验证").findOne().parent().parent().bounds();
             console.log(hk_t);
             var x1_t = hk_t.left + 50,
                 x2_t = hk_t.right - 30,
@@ -65,8 +71,9 @@ var thread1 = threads.start(function () {
             console.log(hk_t.bottom, hk_t.top);
             console.info(x1_t, y1_t, x2_t, y2_t, y, y2);
             console.info(x1_t, y1_t, x2_t, y2_t);
+            delay(0.3);
             swipe(x1_t, y1_t, x2_t, y2_t, 1500);
-            var sleep_i = 0 ;
+            var sleep_i = 0;
             while (text("向右滑动验证").exists()) {
                 if (sleep_i > 3) {
                     console.error("可能滑动失败!");
@@ -75,7 +82,7 @@ var thread1 = threads.start(function () {
                     }
                     delay(1);
                     text("向右滑动验证").waitFor();
-                    var hk_t = className("android.view.View").text("向右滑动验证").findOne().parent().parent().bounds();
+                    var hk_t = textContains("向右滑动验证").findOne().parent().parent().bounds();
                     console.log(hk_t);
                     var x1_t = hk_t.left + 50,
                         x2_t = hk_t.right - 30,
@@ -92,13 +99,10 @@ var thread1 = threads.start(function () {
                 sleep_i++;
                 sleep(900);
             }
-            /*
-            device.setMusicVolume(100);
-            device.vibrate(3000);
-            media.playMusic("./1.wav");
-            sleep(3005);
-            xxx = false;
-            if (whethe) device.setMusicVolume(0);*/
+            console.show();
+            console.setBackgroud("#E6393737");
+            console.setLogSize(10);
+            thread1_ii++;
         }
         if (status) status = false;
     }
@@ -106,10 +110,6 @@ var thread1 = threads.start(function () {
 thread1.waitFor();
 
 function check_easyedge_ocr() {
-    if (!easyedge_ocr_url) {
-        console.error('EasyEdge ocr地址未填写!!!');
-        exit();
-    }
     try {
         var check_url = http.get(easyedge_ocr_url);
         if (check_url.statusCode >= 200 && check_url.statusCode < 300) {
@@ -151,6 +151,8 @@ function get_PaddleOCR() {
 var showlog = false;
 if (shuangren == true || siren == true || 订阅 != 'a' || tiaozhan) {
     console.show();
+    console.setBackgroud("#E6393737");
+    console.setLogSize(10);
     if (siren == true || shuangren == true) {
         console.error('正在获取截图权限，并检查ocr配置是否正确');
         if (ocr_model == 2) get_ocr();
@@ -240,7 +242,7 @@ var qCount = 5; //挑战答题每轮答题数
 var asub = 2; //订阅数
 var aCount = 6; //文章默认学习篇数
 var vCount = 6; //小视频默认学习个数
-var cCount = 2; //收藏+分享+评论次数
+var cCount = 1; //评论次数
 var dayCount = 1; // 每日答题
 var tzCount = 1; // 挑战答题
 var zsyCount = 1; //争上游答题 
@@ -413,27 +415,25 @@ function collectCommentShare() {
     while (!text("欢迎发表你的观点").exists()) {
         toastLog("需要在文章界面");
         delay(1);
-    }
+    }/*
     var textOrder = text("欢迎发表你的观点").findOnce().drawingOrder();
+        var zhuanOrder = textOrder + 3;
+            var shareIcon = className("ImageView").filter(function (iv) {
+                return iv.drawingOrder() == zhuanOrder;
+            }).findOnce();*/
 
-    var zhuanOrder = textOrder + 3;
-
-
-    var shareIcon = className("ImageView").filter(function (iv) {
-        return iv.drawingOrder() == zhuanOrder;
-    }).findOnce();
-
-    toastLog("正在进行分享评论...");
-
-    shareIcon.click(); //点击分享
-    while (!textContains("分享到学习强").exists()); //等待弹出分享选项界面
-    delay(2);
-    click("分享到学习强国");
-    delay(1);
-    toastLog("分享成功!");
-    delay(1);
-    back(); //返回文章界面
-    delay(2);
+    toastLog("正在进行评论...");
+    /*
+        shareIcon.click(); //点击分享
+        while (!textContains("分享到学习强").exists()); //等待弹出分享选项界面
+        delay(2);
+        click("分享到学习强国");
+        delay(1);
+        toastLog("分享成功!");
+        delay(1);
+        back(); //返回文章界面
+        delay(2);
+    */
     //评论
 
     var num = random(0, commentText.length - 1) //随机数
@@ -449,7 +449,7 @@ function collectCommentShare() {
     click("确认"); //确认删除
     //toastLog("评论删除成功!");
     delay(2);
-    toastLog("分享,评论结束");
+    toastLog("评论结束");
 
     //toastLog("收藏成功!");
     //分享
@@ -462,7 +462,7 @@ function collectCommentShare() {
  * @return: null
  */
 function articleStudy(x) {
-    var aCatlog = '推荐'
+    var aCatlog = '思想'
     while (!desc("工作").exists()); //等待加载出主页
     var listView = className("ListView"); //获取文章ListView控件用于翻页
     if (x == 0) {
@@ -563,11 +563,15 @@ function articleStudy(x) {
                 //开始循环进行文章学习
                 article_timing(i, aTime);
                 aCount--;
-                delay(2);
+                delay(2);/*
                 if (sCount != 0) {
                     console.info("第" + (3 - sCount) + "次分享开始");
                     sCount--;
                     collectCommentShare(); //评论和分享
+                }*/
+                if (cCount != 0) {
+                    cCount--;
+                    collectCommentShare(); //评论
                 }
                 back(); //返回主界面
                 console.info('返回主界面');
@@ -773,6 +777,8 @@ function listenToRadio() {
 function start_app() {
     console.setPosition(0, device.height / 2); //部分华为手机console有bug请注释本行
     console.show(); //部分华为手机console有bug请注释本行
+    console.setBackgroud("#E6393737");
+    console.setLogSize(10);
     console.log("正在启动app...");
     if (!(launchApp("学习强国") || launch('cn.xuexi.android'))) //启动学习强国app
     {
@@ -796,6 +802,7 @@ function start_app() {
  * @return: null
  */
 function localChannel() {
+    var i = false;
     delay(1)
     while (!desc("工作").exists()); //等待加载出主页
     desc("工作").click();
@@ -805,7 +812,15 @@ function localChannel() {
         delay(1);
         text("思想").findOne().parent().parent().child(3).click();
         delay(3);
-        className("android.support.v7.widget.RecyclerView").findOne().child(2).click();
+        // className("android.support.v7.widget.RecyclerView").findOne().child(2).click();
+        className("android.support.v7.widget.RecyclerView").findOne().children().forEach(child => {
+            if (i) return;
+            var target = child.findOne(className("android.widget.ImageView"));
+            var target_b = target.bounds();
+            console.log(target_b);
+            click(target_b.centerX(), target_b.centerY());
+            i = true;
+        });
         delay(2);
         console.log("返回主界面");
         back();
@@ -901,11 +916,11 @@ function getScores(i) {
     vCount = 6 - myScores["视听学习"];
     rTime = (6 - myScores["视听学习时长"]) * 60;
     asub = 2 - myScores["订阅"];
-    sCount = 2 - myScores["分享"] * 2
-    cCount = 1 - myScores["发表观点"]
+    // sCount = 2 - myScores["分享"] * 2
+    cCount = 1 - myScores["发表观点"];
     if (myScores["每日答题"] < 5) dayCount = 1;
     else dayCount = 0;
-    if (myScores["挑战答题"] < 6) tzCount = 1;
+    if (myScores["挑战答题"] < 5) tzCount = 1;
     else tzCount = 0;
     if (myScores["四人赛"] == 0) zsyCount = 1;
     else zsyCount = 0;
@@ -917,7 +932,7 @@ function getScores(i) {
     else zhuanxiang = 0;
 
     console.log('评论：' + cCount.toString() + '个')
-    console.log('分享：' + sCount.toString() + '个')
+    /// console.log('分享：' + sCount.toString() + '个')
     console.log('订阅：' + asub.toString() + '个')
     console.log('剩余文章：' + aCount.toString() + '篇')
     console.log('剩余视频：' + vCount.toString() + '个')
@@ -928,6 +943,7 @@ function getScores(i) {
     console.log('双人对战：\t' + doubleCount.toString());
     if (meizhou_txt == "开启")
         console.log('每周答题：\t' + meizhou.toString());
+    console.error("每周答题已不再更新新题！");
     if (zhuanxiang_txt == "开启")
         console.log('专项答题：\t' + zhuanxiang.toString());
 
@@ -1339,6 +1355,7 @@ function clickByTips(tipsStr) {
             }
         });
         if (!isFind) { //没有找到 点击第一个
+            console.info("没有找到 点击第一个");
             listArray[0].child(0).click();
             clickStr += listArray[0].child(0).child(1).text().charAt(0);
         }
@@ -1423,13 +1440,15 @@ function dailyQuestionLoop() {
         } else if (textStartsWith("多选题").exists() || textStartsWith("单选题").exists()) {
             var questionArray = getChoiceQuestion();
             break;
+        } else if (text("再来一组").exists() || text("查看解析").exists() || text("再练一次").exists()) {
+            console.info("答题已结束"); //答题结束
+            break;
         }
-        while (status) { console.log("主线程暂停中"); sleep(750); };
         log('等待题目出现');
         delay(1);
     }
-
-
+    if (text("再来一组").exists() || text("查看解析").exists() || text("再练一次").exists()) return;
+    while (status) { console.log("主线程暂停中"); sleep(750); };
     var blankArray = [];
     var question = "";
     questionArray.forEach(item => {
@@ -1455,7 +1474,10 @@ function dailyQuestionLoop() {
             var tipsStr = getTipsStr();
             answer = getAnswerFromTips(questionArray, tipsStr);
             console.info("提示中的答案：" + answer);
-            if (answer == '') answer = '没有找到提示';
+            if (answer == '') {
+                answer = '没有找到提示';
+                console.error("未找到答案");
+            }
             setText(0, answer.substr(0, blankArray[0]));
             if (blankArray.length > 1) {
                 for (var i = 1; i < blankArray.length; i++) {
@@ -1482,7 +1504,7 @@ function dailyQuestionLoop() {
         }
     }
 
-    delay(0.5);
+    delay(1);
 
     if (text("确定").exists()) {
         text("确定").click();
@@ -1497,7 +1519,7 @@ function dailyQuestionLoop() {
         console.warn("未找到右上角确定按钮控件，根据坐标点击(可能是模拟器)");
         click(device.width * 0.85, device.height * 0.06); //右上角确定按钮，根据自己手机实际修改
     }
-
+    while (status) { console.log("主线程暂停中"); sleep(750); };
     checkAndUpdate(question, ansTiku, answer);
     console.log("------------");
     delay(2);
@@ -1602,16 +1624,16 @@ function dailyAnswer() {
         dailyQuestionLoop();
         if (text("再练一次").exists()) {
             delay(1.5);
-            while(status) {console.log("主线程暂停中");sleep(750);};
-            console.log("每周答题结束！")
+            while (status) { console.log("主线程暂停中"); sleep(750); };
+            console.log("每周答题结束！");
             text("返回").click();
             delay(2);
             back();
             break;
         } else if (text("查看解析").exists()) {
             delay(1.5);
-            while(status) {console.log("主线程暂停中");sleep(750);};
-            console.log("专项答题结束！")
+            while (status) { console.log("主线程暂停中"); sleep(750); };
+            console.log("专项答题结束！");
             back();
             delay(0.5);
             back();
@@ -1626,7 +1648,7 @@ function dailyAnswer() {
                 delay(1);
             } else {
                 delay(1.5);
-                while(status) {console.log("主线程暂停中");sleep(750);};
+                while (status) { console.log("主线程暂停中"); sleep(750); };
                 console.log("每日答题结束！")
                 text("返回").click();
                 delay(2);
@@ -1862,12 +1884,28 @@ function challengeQuestion() {
         delay(2);
         if (!className("RadioButton").exists()) {
             if (复活 == false) {
-                console.log("出现错误，等5秒开始下一轮...")
+                console.log("出现错误，等5秒开始下一轮...");
                 delay(3); //等待3秒才能开始下一轮
-                text("再来一局").click();
-                delay(4);
-                conNum = 0;
-                复活 = true;
+                var f = text("再来一局").exists();
+                var l = text("选择联系人").exists();
+                var fh = text("分享就能复活").exists();
+                if (f) {
+                    text("再来一局").click();
+                    delay(4);
+                    conNum = 0;
+                    复活 = true;
+                } else if (l) {
+                    console.info("当处于复活中! 开始正常答题");
+                    复活 = false;
+                } else if (fh) {
+                    console.info("可以复活！");
+                    textContains('每局仅可复活一次').waitFor();
+                    delay(1);
+                    text("分享就能复活").click();
+                    delay(1);
+                    back();
+                    复活 = false;
+                }
             } else {
                 // toastLog("没有找到题目！请检查是否进入答题界面！");
                 console.error("没有找到题目！请检查是否进入答题界面！");
@@ -1888,7 +1926,7 @@ function challengeQuestion() {
             }
             if (lNum >= lCount) {
                 delay(1.2);
-                while(status) {console.log("主线程暂停中");sleep(750);};
+                while (status) { console.log("主线程暂停中"); sleep(750); };
                 console.log("挑战答题结束！返回我要答题界面！");
                 if (复活) {
                     textContains('每局仅可复活一次').waitFor();
@@ -1903,20 +1941,24 @@ function challengeQuestion() {
             } else {
                 if (复活 && conNum < qCount) {
                     复活 = false;
+                    delay(0.5);
+                    while (status) { console.log("主线程暂停中"); sleep(750); };
                     textContains('分享就能复活').findOne().click();
                     delay(0.5);
                     back();
                     delay(1);
                 } else {
                     if (复活) {
+                        while (status) { console.log("主线程暂停中"); sleep(750); };
                         textContains('每局仅可复活一次').waitFor();
                         delay(1);
                         back();
                     }
-                    console.log("等5秒开始下一轮...")
+                    console.log("等5秒开始下一轮...");
                     delay(3); //等待3秒才能开始下一轮
                     text("再来一局").click();
                     delay(4);
+                    while (status) { console.log("主线程暂停中"); sleep(750); };
                     conNum = 0;
                     复活 = true;
                 }
@@ -2546,7 +2588,7 @@ function zsyAnswer() {
         }
     }
     console.info('答题结束'); // 竞赛结束
-    while(status) {console.log("主线程暂停中");sleep(750);};
+    while (status) { console.log("主线程暂停中"); sleep(750); };
     delay(2);
     back();
     delay(3);
@@ -2562,6 +2604,47 @@ function zsyAnswer() {
             click(device.width * 0.2, device.height * 0.53);
         }
         sleep(random_time(delay_time));
+    }
+    // 防止没成功退出
+    if (text("继续挑战").exists()) {
+        console.error("退出结算页面失败 重新尝试退出");
+        while (status) { console.log("主线程暂停中"); sleep(750); };
+        back();
+        while (status) { console.log("主线程暂停中"); sleep(750); };
+    }
+    if (!textContains("排行榜").exists) {
+        delay(1);
+        if (textContains("开始比赛").exists() || textContains("随机匹配").exists()) {
+            console.error("仍处于准备比赛页面！");
+            back();
+            delay(3);
+            back();
+            delay(3);
+            if (count == 1) {
+                if (className("android.view.View").text("确定离开擂台吗？").exists()) {
+                    delay(2);
+                    className("android.widget.Button").text("退出").findOne().click();
+                } else {
+                    console.warn('没有找到退出，按坐标点击(可能失败)\n如果没返回，手动退出双人赛即可继续运行');
+                    delay(2);
+                    click(device.width * 0.2, device.height * 0.53);
+                }
+                sleep(random_time(delay_time));
+            }
+        } else {
+            console.error("未知错误！ ");
+            while (true) {
+                back();
+                sleep(1500);
+                if (textContains("确定离开擂台吗？").exists()) {
+                    text("确定").click();
+                }
+                if (textContains("排行榜").exists()) {
+                    console.info("已返回我要答题页面");
+                    break;
+                }
+            }
+        }
     }
 }
 
@@ -2656,8 +2739,8 @@ function rand_mode() {
     var start = new Date().getTime(); //程序开始时间
     getScores(0); //获取积分
     re_store();
-    // diandian();
-    var arr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];;
+
+    var arr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
     var t;
     for (var i = 0; i < arr.length; i++) {
         var rand = parseInt(Math.random() * arr.length);
@@ -2684,6 +2767,7 @@ function rand_mode() {
         } else if (arr[i] == 7) {
             每日();
         } else if (arr[i] == 8) {
+            //} else if (true) {
             本地();
         } else if (arr[i] == 9) {
             四人();
@@ -2698,6 +2782,7 @@ function rand_mode() {
     }
     end = new Date().getTime();
     console.log("运行结束,共耗时" + (parseInt(end - start)) / 1000 + "秒");
+    console.log("共发生 " + thread1_i + "次人机验证，成功滑动 " + thread1_ii + "次");
     if (whethe) {
         delay(2);
         device.setMusicVolume(volume);
@@ -2728,6 +2813,7 @@ function 专项() {
 
 function 每周() {
     if (meizhou_txt == true && meizhou != 0) {
+        console.error("每周答题已不再更新新题！");
         console.info('开始每周答题');
         delay(1);
         if (!text("排行榜").exists()) {
@@ -2858,7 +2944,7 @@ function 视频学习() {
         console.info("等待3秒，然后确认视频是否已满分。");
         delay(3);
         getScores(2);
-        // diandian();
+
         x++;
         if (x > 2) { //尝试三次
             console.info("尝试2次，跳过。");
@@ -2869,7 +2955,7 @@ function 视频学习() {
 
 function 本地() {
     if (myScores['本地频道'] != 1 && loca == true) {
-        //	if (true) {
+    //if (true) {
         console.info('开始本地频道');
         if (text("排行榜").exists()) {
             delay(0.5);
@@ -2955,7 +3041,6 @@ function 文章和广播() {
         console.info("等待3秒，然后确认文章是否已满分。");
         delay(3);
         getScores(1);
-        // diandian();
         x++;
         if (x > 2) { //尝试三次
             console.info("尝试3次未满分，暂时跳过。");
