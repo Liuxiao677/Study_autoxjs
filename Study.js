@@ -1,5 +1,5 @@
 "auto";
-console.setTitle("科技!解放!","#ff11ee00",20);
+console.setTitle("科技!解放!", "#ff11ee00", 20);
 auto.waitFor();
 importClass(android.database.sqlite.SQLiteDatabase);
 importClass(java.net.HttpURLConnection);
@@ -1010,17 +1010,29 @@ function pic_click(a, b, s1) {
 }
 
 function sub() {
+    var storage = storages.create("订阅");
     console.info('正在订阅');
+    delay(0.3);
+    desc("工作").click();
+    delay(1);
+    click("订阅");
+    var d = false;
+    className("android.support.v7.widget.RecyclerView").findOne().children().forEach(child => {
+        if (d) return;
+        var dy = child.findOne(className("android.widget.FrameLayout").depth(25));
+        var dy_b = dy.bounds();
+        console.log(dy_b);
+        click(dy_b.centerX(), dy_b.centerY());
+        d = true;
+    });
+    /*
     h = device.height; //屏幕高
     w = device.width; //屏幕宽
     x = (w / 3) * 2;
     h1 = (h / 6) * 5;
     h2 = (h / 6);
-    desc("工作").click();
     delay(1);
-    click("订阅");
-    delay(1);
-    click("添加");
+    click("添加");*/
     delay(3);
     if (!desc('推荐').exists()) {
         console.info('没有找到，可能你的xxqg不是2.33及以下版本，不支持订阅！！！');
@@ -1032,9 +1044,12 @@ function sub() {
     var len = desc('推荐').depth(15).findOne().parent();
     var s1 = className("android.view.View").depth(14).scrollable(true).findOne().child(0).child(2).bounds().left;
     var old_names = '';
+    var save_i;
     console.log('搜索中');
     for (var i = 0; i < len.childCount() - 1 && asub != 0; i++) {
         if (订阅 == 'c') i = 1;
+        if (storage.contains("save_i")) i = storage.get("save_i");
+        save_i = i;
         len.child(i).click();
         delay(1);
         while (true && asub != 0) {
@@ -1061,6 +1076,7 @@ function sub() {
         back();
         delay(1);
         back_table();
+        if (!save_i == null) storage.put("save_i", save_i);
         console.info('订阅完成');
         return 0;
     }
@@ -1656,6 +1672,7 @@ function dailyAnswer() {
             }
         }
     }
+    while (status) { console.log("主线程暂停中"); sleep(750); };
     console.setPosition(0, device.height / 2);
 }
 
@@ -1883,6 +1900,7 @@ function challengeQuestion() {
         while (status) { console.log("主线程暂停中"); sleep(750); };
         delay(2);
         if (!className("RadioButton").exists()) {
+            while (status) { console.log("主线程暂停中"); sleep(750); };
             if (复活 == false) {
                 console.log("出现错误，等5秒开始下一轮...");
                 delay(3); //等待3秒才能开始下一轮
@@ -1913,6 +1931,7 @@ function challengeQuestion() {
                 break;
             }
         }
+        while (status) { console.log("主线程暂停中"); sleep(750); };
         challengeQuestionLoop(conNum);
         delay(1);
         if (text('wrong@3x.9ccb997c').exists() || text('2kNFBadJuqbAAAAAElFTkSuQmCC').exists() || text(
@@ -1929,10 +1948,13 @@ function challengeQuestion() {
                 while (status) { console.log("主线程暂停中"); sleep(750); };
                 console.log("挑战答题结束！返回我要答题界面！");
                 if (复活) {
+                    while (status) { console.log("主线程暂停中"); sleep(750); };
                     textContains('每局仅可复活一次').waitFor();
                     delay(1);
                     back();
                 }
+
+                while (status) { console.log("主线程暂停中"); sleep(750); };
                 textContains("再来一局").waitFor();
                 delay(1);
                 back();
@@ -2659,20 +2681,25 @@ function rt() {
         console.log('设置脚本运行最长时间为：' + ta + 's');
         device.keepScreenOn(ta * 1000 + 60000);
         thread = threads.start(function () {
-            rand_mode();
+            sleep(ta * 1000);
+            console.log('脚本运行时间已达到' + ta + 's，自动退出');
+            engines.stopAllAndToast();
+            threads.shutDownAll();
         })
-        thread.join(ta * 1000);
-        thread.interrupt();
-        console.error('脚本超时或者出错！！！，重启脚本');
-        if (!(launchApp("学习强国") || launch('cn.xuexi.android'))) //启动学习强国app
-        { }
-        console.info('等待10s后继续开始');
-        toast('等待10s后继续开始');
-        delay(10);
-        back_table();
-        toast(' ');
-        delay(1);
-        if (num > 3) break;
+        try {
+            rand_mode();
+        }
+        catch (e) {
+            console.error('脚本超时或者出错！！！，可能会重启脚本');
+            if (!(launchApp("学习强国") || launch('cn.xuexi.android'))) //启动学习强国app
+                console.info('等待10s后继续开始');
+            toast('等待10s后继续开始');
+            delay(10);
+            back_table();
+            toast(' ');
+            delay(1);
+            if (num > 3) break;
+        }
     }
     console.error('已经重新运行了3轮，停止脚本');
     question_list = null;
@@ -2740,7 +2767,7 @@ function rand_mode() {
     getScores(0); //获取积分
     re_store();
 
-    var arr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    var arr = [0, 1, 2, 3, 4];
     var t;
     for (var i = 0; i < arr.length; i++) {
         var rand = parseInt(Math.random() * arr.length);
@@ -2748,31 +2775,37 @@ function rand_mode() {
         arr[rand] = arr[i];
         arr[i] = t;
     }
+
+    var arr_1 = [0, 1, 2, 3, 4, 5];
+    var t_1;
+    for (var i = 0; i < arr.length; i++) {
+        var rand_1 = parseInt(Math.random() * arr_1.length);
+        t_1 = arr_1[rand_1];
+        arr_1[rand_1] = arr[i_1];
+        arr_1[i] = t_1;
+    }
+
     for (var i = 0; i < arr.length; i++) {
         if (arr[i] == 0) {
-            专项();
+            for (var i = 0; i < arr_1.length; i++) {
+                if (arr_1 == 0) 专项();
+                if (arr_1 == 1) 每周();
+                if (arr_1 == 2) 挑战();
+                if (arr_1 == 3) 双人();
+                if (arr_1 == 4) 每日();
+                if (arr_1 == 5) 四人();
+            }
         } else if (arr[i] == 1) {
-            每周();
-        } else if (arr[i] == 2) {
             视频学习();
-        } else if (arr[i] == 3) {
+        } else if (arr[i] == 2) {
             订();
-        } else if (arr[i] == 4) {
-            //} else if (true) {
-            挑战();
-        } else if (arr[i] == 5) {
+        } else if (arr[i] == 3) {
             文章和广播();
-        } else if (arr[i] == 6) {
-            双人();
-        } else if (arr[i] == 7) {
-            每日();
-        } else if (arr[i] == 8) {
-            //} else if (true) {
+        } else if (arr[i] == 4) {
             本地();
-        } else if (arr[i] == 9) {
-            四人();
         }
     }
+
     question_list = null;
     article_list = null;
     back_table();
@@ -2955,7 +2988,7 @@ function 视频学习() {
 
 function 本地() {
     if (myScores['本地频道'] != 1 && loca == true) {
-    //if (true) {
+        //if (true) {
         console.info('开始本地频道');
         if (text("排行榜").exists()) {
             delay(0.5);
@@ -2980,7 +3013,8 @@ function 本地() {
 }
 
 function 订() {
-    if (订阅 != 'a' && asub != 0) {
+    // if (订阅 != 'a' && asub != 0) {
+    if (true) {
         if (text("排行榜").exists()) {
             delay(0.5);
             back();
