@@ -1,12 +1,56 @@
-"auto";
 console.setTitle("科技!解放!", "#ff11ee00", 20);
-auto.waitFor();
 importClass(android.database.sqlite.SQLiteDatabase);
-importClass(java.net.HttpURLConnection);
-importClass(java.net.URL);
 importClass(java.io.File);
 importClass(java.io.FileOutputStream);
-console.info("读配置文件");
+
+try {
+    let pkgs = context.getPackageManager().getPackageInfo("cn.xuexi.android", 0);
+    var version = pkgs.versionName.split('.').join('');
+    console.log(version);
+} catch (e) {
+    console.error("未安装学习强国！");
+    toastLog("打开浏览器下载学习强国");
+    sleep(1000);
+    app.openUrl("https://android-apps.pp.cn/fs08/2021/11/19/11/110_4006e865850201df8b3d41c0a9fa028e.apk")
+    exit();
+}
+var d_c = true,
+    open_URL = false;
+if (version > 2310) {
+    console.error('强国版本大于2.31.0！');
+    threads.start(function () {
+        var d = dialogs.build({
+            title: "是否下载并安装2.31.0版本的学习强国？ \n 15秒后自动关闭",
+            content: "点击确定将跳转到豌豆荚下页面",
+            positive: "确定",
+            negative: "取消",
+        })
+        d.on("any", (action, dialog) => {
+            if (action == "positive") {
+                toastLog("打开浏览器下载学习强国");
+                app.openUrl("https://android-apps.pp.cn/fs08/2021/11/19/11/110_4006e865850201df8b3d41c0a9fa028e.apk")
+                d_c = false;
+                open_URL = true;
+                exit();
+            } else {
+                d_c = false;
+            }
+        }).show();
+        d.on("dismiss", (dialog) => {
+            d_c = false;
+        }).show();
+        sleep(15000);
+        if (d_c) {
+            d.dismiss();
+            d_c = false;
+        }
+    })
+} else d_c = false;
+while (d_c) {
+    sleep(500);
+}
+if (open_URL) exit();
+    console.info("读配置文件");
 try {
     var 配置_其他 = files.read('/sdcard/科技!解放!/profile_其他.json');
     配置_其他 = JSON.parse(配置_其他);
@@ -16,37 +60,34 @@ try {
     console.error("无法读取配置文件");
     exit();
 }
-var path = '/sdcard/科技!解放!/QuestionBank.db';
+var ocr_api = require('ocr.js'),
+    check = require('./check.js'),
+    path = '/sdcard/科技!解放!/QuestionBank.db',
+    meizhou_txt = 配置_选项.meizhou,
+    zhuanxiang_txt = 配置_选项.zhuangxiang,
+    siren = 配置_选项.shireng,
+    loca = 配置_选项.loca,
+    debug = false,
+    shuangren = 配置_选项.shuangreng,
+    articles = 配置_选项.article,
+    video = 配置_选项.video,
+    meiri = 配置_选项.meiri,
+    tiaozhan = 配置_选项.tiaozhan,
+    订阅 = 配置_选项.ssub,
+    first_com_no = 配置_选项.first_com_no,// 首轮不答
+    ocr_model = 配置_其他.ocr_kind,
+    whethe = 配置_选项.whethe,
+    专项答题下滑 = 配置_其他.Z_mode,
+    每周答题下滑 = 配置_其他.M_mode,
+    竞赛延迟时间 = 配置_其他.com_sleep * 1,
+    pos_sleep = 1,
+    question_list = [],
+    thread1_i = 0,
+    thread1_ii = 0,
+    status = false;//是否暂停
+auto.waitFor();
 device.wakeUpIfNeeded(); //点亮屏幕
-var meizhou_txt = 配置_选项.meizhou;
-var zhuanxiang_txt = 配置_选项.zhuanxiang;
-var siren = 配置_选项.shireng;
-var loca = 配置_选项.loca;
-var debug = false;
-var shuangren = 配置_选项.shuangreng;
-var articles = 配置_选项.article;
-var video = 配置_选项.video;
-var meiri = 配置_选项.meiri;
-var tiaozhan = 配置_选项.tiaozhan;
-var 订阅 = 配置_选项.ssub;
-var first_com_no = 配置_选项.first_com_no;// 首轮不答
-var cic = false;
-var easyedge_ocr_url = 'http://127.0.0.1:34567/';
-var ocr_model = 配置_其他.ocr_kind;
-var whethe = 配置_选项.whethe;
 if (whethe) var volume = device.getMusicVolume();
-var 专项答题下滑 = 配置_其他.Z_mode;
-var 每周答题下滑 = 配置_其他.M_mode;
-var 竞赛延迟时间 = 配置_其他.com_sleep * 1;
-var pos_sleep = 1;
-let ocr;
-var token;
-var ttt;
-var question_list = [];
-var thread1_i = 0;
-var thread1_ii = 0;
-var status = false;//是否暂停
-while (status) { console.log("主线程暂停中"); sleep(750); };
 /**
  * 人机验证
  */
@@ -54,10 +95,10 @@ var thread1 = threads.start(function () {
     console.info("反滑块验证已启动");
     while (true) {
         if (textContains('访问异常').exists()) {
+            status = true;
             console.hide();
             toastLog("隐藏控制台");
             thread1_i++;
-            status = true;
             console.error("人机验证！");
             textContains("向右滑动验证").waitFor();
             var hk_t = textContains("向右滑动验证").findOne().parent().parent().bounds();
@@ -109,166 +150,162 @@ var thread1 = threads.start(function () {
 });
 thread1.waitFor();
 
-function check_easyedge_ocr() {
+console.show();
+console.setBackgroud("#E6393737");
+console.setLogSize(10);
+if (siren || shuangren) {
+    console.error('正在获取截图权限，并检查ocr配置是否正确');
+    if (ocr_model == 2) check.ocr_hr();
+    else if (ocr_model == 0) {
+        check.ocr_fj();
+    } else if (ocr_model == 1) check.ocr_ww();
+}
+console.info('检查每日每周专项题库');
+if (!files.exists(path)) {
+    console.error("每日每周专项题库未找到，请重新释放题库");
+    exit();
+}
+if (!files.exists('/sdcard/科技!解放!/question.txt')) {
+    console.error('未找到竞赛答题题库，请重新释放题库');
+    exit();
+}
+if (whethe) {
+    console.info('正在自动静音')
     try {
-        var check_url = http.get(easyedge_ocr_url);
-        if (check_url.statusCode >= 200 && check_url.statusCode < 300) {
-            console.info('easyedge_ocr正常');
-        } else if (check_url.statusCode == 404) {
-            console.error('easyedge_ocr异常');
+        device.setMusicVolume(0);
+    } catch (e) {
+        console.error('权限不足，请给 “允许修改系统设置” 权限');
+        console.warn('将尝试跳转到设置页面，赋予权限后请重启脚本');
+        delay(2);
+        device.setMusicVolume(volume);
+    }
+}
+if (tiaozhan || siren || shuangren)
+    init();
+if (tiaozhan && (!siren || !shuangren)) {
+    console.info('只开了挑战答题，跳过OCR检查'); //只开了挑战答题的话
+} else if (siren || shuangren) {
+    threads.start(function () {
+        if (!requestScreenCapture(false)) {
+            toastLog("请求截图失败,脚本结束");
             exit();
+        }
+    });
+    delay(1.5);
+    if (textContains("立即开始").exists() || textContains("允许").exists()) {
+        if (textContains("立即开始").exists()) {
+            textContains("立即开始").className("Button").findOne().click();
         } else {
-            console.error('错误: 请检查OCR');
+            textContains("允许").className("Button").findOne().click();
+        }
+        console.info('自动点击获取权限按键！！！');
+    }
+    while (true) {
+        try {
+            captureScreen();
+            break;
+        } catch (e) {
+            console.log('等待截图权限中');
+        };
+        sleep(1500);
+    }
+    console.info('立即开始，允许截图权限已获取！！！');
+    let ocr;
+    console.time('文字识别');
+    switch (ocr_model) {
+        case 0:
+            console.log('\n使用飞浆OCR');
+            ocr = ocr_api.fj(images.clip(captureScreen(), 0, Math.floor(device.height / 2), device.width, Math.floor(
+                device.height / 2)));
+            break;
+        case 1:
+            console.log('\n使用外置OCR');
+            ocr = ocr_api.ww(images.clip(captureScreen(), 0, Math.floor(device.height / 2), device.width, Math.floor(
+                device.height / 2)));
+            break;
+        case 2:
+            console.log('\n使用浩然OCR');
+            ocr = ocr_api.hr(images.clip(captureScreen(), 0, Math.floor(device.height / 2), device.width, Math.floor(
+                device.height / 2)));
+            break;
+    }
+    console.timeEnd('文字识别');
+    if (ocr != null) console.log(ocr);
+    else { console.log('识别失败'); exit(); }
+    ocr = null;
+} else if (订阅) {
+    threads.start(function () {
+        if (!requestScreenCapture(false)) {
+            toastLog("请求截图失败,脚本结束");
             exit();
         }
-    } catch (e) {
-        console.error('easyedge_ocr未启动!!!');
-        exit();
+    });
+    delay(1.5);
+    if (textContains("立即开始").exists() || textContains("允许").exists()) {
+        if (textContains("立即开始").exists()) {
+            textContains("立即开始").className("Button").findOne().click();
+        } else {
+            textContains("允许").className("Button").findOne().click();
+        }
+        console.info('自动点击获取权限按键！！！');
     }
-}
-
-function get_ocr() {
-    console.info("你选择了第三方文字识别（OCR）");
-    try {
-        ocr = plugins.load('com.hraps.ocr');
-    } catch (e) {
-        console.error('未安装OCR插件，正在跳转浏览器下载\n密码:7faj');
-        app.openUrl('https://twelve123.lanzouq.com/b017az0kj');
-        exit();
-    }
-}
-
-function get_PaddleOCR() {
-    console.info("你选择了内置飞浆文字识别（OCR）");
-    if (typeof (paddle) == "object") {
-        console.info("找到内置飞浆调用方法");
-    } else {
-        console.error("无法找到内置飞浆调用方法");
-        exit();
-    }
-}
-
-var showlog = false;
-if (shuangren == true || siren == true || 订阅 != 'a' || tiaozhan) {
-    console.show();
-    console.setBackgroud("#E6393737");
-    console.setLogSize(10);
-    if (siren == true || shuangren == true) {
-        console.error('正在获取截图权限，并检查ocr配置是否正确');
-        if (ocr_model == 2) get_ocr();
-        else if (ocr_model == 0) {
-            get_PaddleOCR();
-        } else if (ocr_model == 1) check_easyedge_ocr();
-    }
-    console.info('检查每日每周专项题库');
-    if (!files.exists(path)) {
-        console.error("每日每周专项题库未找到，请在UI页面更新下载!");
-        exit();
-    }
-    delay(2);
-    if (whethe) {
-        console.info('正在自动静音')
+    while (true) {
         try {
-            device.setMusicVolume(0);
+            captureScreen();
+            break;
         } catch (e) {
-            console.error('权限不足，请给 “允许修改系统设置” 权限');
-            console.warn('将尝试跳转到设置页面，赋予权限后请重启脚本');
-            delay(2);
-            device.setMusicVolume(volume);
-        }
+            console.log('等待截图权限中');
+        };
+        sleep(1500);
     }
-    if (tiaozhan || siren || shuangren)
-        init();
-    if (tiaozhan && !(siren == true || shuangren == true || 订阅 != 'a')) { } //只开了挑战答题的话
-    else {
-        threads.start(function () {
-            if (!requestScreenCapture(false)) {
-                toastLog("请求截图失败,脚本结束");
-                exit();
-            }
-        });
-        delay(1.5);
-        if (textContains("立即开始").exists() || textContains("允许").exists()) {
-            if (textContains("立即开始").exists()) {
-                textContains("立即开始").className("Button").findOne().click();
-            } else {
-                textContains("允许").className("Button").findOne().click();
-            }
-            console.info('自动点击获取权限按键！！！');
-        }
-        while (true) {
-            try {
-                captureScreen();
-                break;
-            } catch (e) {
-                console.log('等待截图权限中');
-            };
-            sleep(1500);
-        }
-        console.info('立即开始，允许截图权限已获取！！！');
-        if (ocr_model == 2) {
-            console.time('文字识别');
-            console.log('\n测试浩然识别中');
-            console.info('\n如果脚本结束，出现红字，则安装错误的OCR位数,卸载安装的OCR插件');
-            let text = ocr_api(images.clip(captureScreen(), 0, Math.floor(device.height / 2), device.width, Math.floor(device
-                .height / 2)));
-            console.timeEnd('文字识别');
-            console.log(text);
-            console.log("");
-        } else if (ocr_model == 0) {
-            console.time('文字识别');
-            console.log('\n测试内置飞浆识别中');
-            let text = paddle_ocr_api(images.clip(captureScreen(), 0, Math.floor(device.height / 2), device.width, Math.floor(
-                device.height / 2)));
-            console.timeEnd('文字识别');
-            console.log(text);
-            console.log("");
-        } else if (ocr_model == 1) {
-            console.time('文字识别');
-            console.log('\n测试EasyEdge OCR识别中');
-            let text = easyedge_ocr_api(images.clip(captureScreen(), 0, Math.floor(device.height / 2), device.width, Math.floor(
-                device.height / 2)));
-            console.timeEnd('文字识别');
-            console.log(text);
-            console.log("");
-        }
-    }
-
+}
+else {
+    toastLog("没开订阅 或 竞赛 或 挑战答题？");
 }
 
 var lCount = 1; //挑战答题轮数
-var qCount = 5; //挑战答题每轮答题数
-
-var asub = 2; //订阅数
-var aCount = 6; //文章默认学习篇数
-var vCount = 6; //小视频默认学习个数
-var cCount = 1; //评论次数
-var dayCount = 1; // 每日答题
-var tzCount = 1; // 挑战答题
-var zsyCount = 1; //争上游答题 
-var doubleCount = 1; // 双人对战
-var meizhou = 1; //每周答题
-var zhuanxiang = 1; //专项答题
-
-var aTime = 61; //有效阅读一分钟1分*6
-var vTime = 6; //每个小视频学习-5秒
-var rTime = 370; //广播收听6分 * 60 = 360秒
-
-var 点点通 = {
-    '有效视听': 0,
-    '有效浏览': 0,
-    '挑战答题': 0
-};
-var myScores = {}; //分数
-var article_list = [];
+qCount = 5, //挑战答题每轮答题数
+    asub = 2, //订阅数
+    aCount = 6, //文章默认学习篇数
+    vCount = 6, //小视频默认学习个数
+    cCount = 1, //评论次数
+    dayCount = 1, // 每日答题
+    tzCount = 1, // 挑战答题
+    zsyCount = 1, //争上游答题 
+    doubleCount = 1, // 双人对战
+    meizhou = 1, //每周答题
+    zhuanxiang = 1, //专项答题
+    aTime = 60, //有效阅读一分钟1分*6
+    vTime = 5, //每个小视频学习-5秒
+    rTime = 360, //广播收听6分 * 60 = 360秒
+    点点通 = {
+        '有效视听': 0,
+        '有效浏览': 0,
+        '挑战答题': 0
+    },
+    myScores = {}; //分数
+// 读取/sdcard/科技!解放!/learned_article.txt 并添加到article_list数组中 
+if (files.exists("/sdcard/科技!解放!/learned_article.txt")) {
+    log("读取已学习文章")
+    let time = new Date().getTime();
+    var article_list = files.read("/sdcard/科技!解放!/learned_article.txt").split("\n");
+    for (let i = 0; i < article_list.length; i++) {
+        article_list[i] = article_list[i].split(" ");
+    }
+    let timeEnd = new Date().getTime();
+    console.log("耗时" + (parseInt(timeEnd - time)) / 1000 + "秒");
+} else {
+    var article_list = [];
+}
 var delay_time = 1000;
+
 /**
  * @description: 延时函数
  * @param: seconds-延迟秒数s
  * @return: null
  */
 function delay(seconds) {
-    sleep(1000 * seconds + randomNum(0, 500)); //sleep函数参数单位为毫秒所以乘1000
+    sleep(1000 * seconds + randomNum(0, 500));
 }
 /**
  * @description: 随机秒数
@@ -277,15 +314,6 @@ function delay(seconds) {
  */
 function random_time(time) {
     return time + random(100, 1000);
-}
-/**
- * @description: 点击文本控件
- * @param: 文本
- * @return: null
- */
-function my_click_clickable(target) {
-    text(target).waitFor();
-    click(target);
 }
 /**
  * @description: 生成从minNum到maxNum的随机数
@@ -390,6 +418,7 @@ function radio_timing(r_time, seconds) {
  * @return: null
  */
 function insertLearnedArticle(article) {
+    files.append("/sdcard/科技!解放!/learned_article.txt", article + "\n");
     article_list.push(article);
 }
 
@@ -415,44 +444,41 @@ function collectCommentShare() {
     while (!text("欢迎发表你的观点").exists()) {
         toastLog("需要在文章界面");
         delay(1);
-    }/*
-    var textOrder = text("欢迎发表你的观点").findOnce().drawingOrder();
-        var zhuanOrder = textOrder + 3;
-            var shareIcon = className("ImageView").filter(function (iv) {
-                return iv.drawingOrder() == zhuanOrder;
-            }).findOnce();*/
+    }
 
-    toastLog("正在进行评论...");
-    /*
-        shareIcon.click(); //点击分享
-        while (!textContains("分享到学习强").exists()); //等待弹出分享选项界面
-        delay(2);
-        click("分享到学习强国");
-        delay(1);
-        toastLog("分享成功!");
-        delay(1);
-        back(); //返回文章界面
-        delay(2);
-    */
+    console.info("正在进行评论...");
     //评论
-
     var num = random(0, commentText.length - 1) //随机数
-    click("欢迎发表你的观点");
+    text("欢迎发表你的观点").findOne().click();
     delay(1);
     setText(commentText[num]); //输入评论内容
-    delay(1);
-    click("发布"); //点击右上角发布按钮
+    text("发布").waitFor();
+    text("发布").findOne().click(); //点击右上角发布按钮
     //toastLog("评论成功!");
+    /*
     delay(2);
     click("删除"); //删除该评论
     delay(2);
     click("确认"); //确认删除
     //toastLog("评论删除成功!");
-    delay(2);
-    toastLog("评论结束");
-
-    //toastLog("收藏成功!");
-    //分享
+    delay(2);*/
+    while (true) {
+        console.info("等待删除按钮出现")
+        text("删除").waitFor() //等待删除按钮出现
+        delay(0.5);
+        text("删除").findOne().click(); //点击确认删除
+        break
+    }
+    while (true) {
+        console.info("等待确认按钮出现")
+        text("确认").waitFor() //等待确认按钮出现
+        delay(0.5);
+        // click("确认"); //点击确认按钮
+        text("确认").findOne().click();
+        break
+    }
+    console.info("评论结束");
+    delay(1)
 }
 
 
@@ -462,17 +488,35 @@ function collectCommentShare() {
  * @return: null
  */
 function articleStudy(x) {
-    var aCatlog = '思想'
+    var aCatlog = ['要闻', '思想']
+    var num = random(0, aCatlog.length - 1) //随机数
+    aCatlog = aCatlog[num];
+    console.info("随机选择的文章分类是：" + aCatlog);
+    if (aCatlog == "要闻") {
+        var aCatlog_z = ['头条', '纪实'];
+        var num = random(0, aCatlog_z.length - 1); //随机数
+        aCatlog_z = aCatlog_z[num];
+        console.info("随机选择的文章子分类是：" + aCatlog_z);
+    } else if (aCatlog == "思想") {
+        var aCatlog_z = ['重要活动', '函电贺词', '学习金句', '与人民在一起', '引经据典'];
+        var num = random(0, aCatlog_z.length - 1); //随机数
+        aCatlog_z = aCatlog_z[num];
+        console.info("随机选择的文章子分类是：" + aCatlog_z);
+    }
     while (!desc("工作").exists()); //等待加载出主页
     var listView = className("ListView"); //获取文章ListView控件用于翻页
     if (x == 0) {
+        click("推荐");
         desc("工作").click(); //点击主页正下方的"学习"按钮
         delay(2);
-        click(aCatlog);
+        // click(aCatlog);
+        text(aCatlog).depth(17).findOne().parent().click();
+        delay(2);
+        // click(aCatlog_z);
+        console.info(aCatlog_z + click(aCatlog_z))
     }
     delay(2);
     var zt_flag = false; //判断进入专题界面标志
-    var fail = 0; //点击失败次数
     var x = aCount;
     if (点点通['有效浏览']) {
         x = Math.max(点点通['有效浏览'] * 6 - (6 - aCount), 点点通['有效浏览'] * 6);
@@ -481,7 +525,19 @@ function articleStudy(x) {
     for (var i = 0, t = 0; i < x;) {
         if (aCount <= 0) aTime = 6;
         try {
-            if ((text('播报').findOnce(t).parent().parent().parent().child(0).parent().parent().click()) == true) {
+            let txtCk = false;
+            var 点击播报的N个父控件 = text('播报').findOnce(t).parent().parent().parent().child(0).parent().parent().click();
+            if (!点击播报的N个父控件) {
+                console.warn('尝试用播报的父控件点击失败，尝试用“学习强国”学习平台文本进行点击');
+                let b = text("“学习强国”学习平台").findOnce(t).bounds(); //由于部分文章的播报按钮是没有的，所以需要用文本的bounds进行坐标点击
+                console.hide(); //防止点到控制台
+                click(b.centerX(), b.centerY());
+                txtCk = true;
+                console.show();
+                console.setBackgroud("#E6393737");
+                console.setLogSize(10);
+            }
+            if (点击播报的N个父控件 || txtCk) {
                 delay(3);
                 // // delay(10); //等待加载出文章页面，后面判断是否进入了视频文章播放要用到
                 //获取当前正在阅读的文章标题
@@ -489,6 +545,11 @@ function articleStudy(x) {
                 while (!textContains("欢迎发表你的观点").exists()) { //如果没有找到评论框则认为没有进入文章界面，一直等待
                     delay(1);
                     console.warn("正在等待加载文章界面...");
+                    if (className("android.view.View").text("刷新").depth(21).exists()) {
+                        console.log("网络不佳，点击刷新");
+                        className("android.view.View").text("刷新").depth(21).click();
+                        delay(1);
+                    }
                     if (n > 2) { //等待超过3秒则认为进入了专题界面，退出进下一篇文章
                         console.warn("没找到评论框!该界面非文章界面!");
                         zt_flag = true;
@@ -513,10 +574,10 @@ function articleStudy(x) {
                     delay(2);
                     continue;
                 }
-                if (zt_flag == true) { //进入专题页标志
-                    console.warn("进入了专题界面，即将退出并进下一篇文章!");
+                if (zt_flag) { //进入专题页标志
+                    console.warn("进入了专题界面或者文本点击未成功");
                     t++;
-                    back();
+                    if (!txtCk) back();
                     delay(2);
                     zt_flag = false;
                     continue;
@@ -546,7 +607,9 @@ function articleStudy(x) {
                     delay(2);
                     continue;
                 }
-                var flag = getLearnedArticle(currentNewsTitle);
+                console.log("判断文章是否已读");
+                let flag = getLearnedArticle(currentNewsTitle);
+                log(flag);
                 if (flag) {
                     //已经存在，表明阅读过了
                     console.info("该文章已经阅读过，即将退出并阅读下一篇");
@@ -559,16 +622,10 @@ function articleStudy(x) {
                     insertLearnedArticle(currentNewsTitle);
                 }
                 console.log("正在学习第" + (i + 1) + "篇文章,标题：", currentNewsTitle);
-                fail = 0; //失败次数清0
                 //开始循环进行文章学习
                 article_timing(i, aTime);
                 aCount--;
-                delay(2);/*
-                if (sCount != 0) {
-                    console.info("第" + (3 - sCount) + "次分享开始");
-                    sCount--;
-                    collectCommentShare(); //评论和分享
-                }*/
+                delay(2);
                 if (cCount != 0) {
                     cCount--;
                     collectCommentShare(); //评论
@@ -576,7 +633,19 @@ function articleStudy(x) {
                 back(); //返回主界面
                 console.info('返回主界面');
                 delay(0.3);
+                let s = 0
+                let a = false;
                 while (!desc("工作").exists()) { //等待加载出主页
+                    s++
+                    if (s > 2 && !a) {
+                        back();
+                        s = 0;
+                        a = true;
+                    } else if (s > 2 && a) {
+                        console.error("无法返回主页面！")
+                        launch('cn.xuexi.android')
+                        delay(5);
+                    }
                     console.info("等待加载主页");
                     delay(2);
                 }
@@ -598,49 +667,10 @@ function articleStudy(x) {
     }
     aTime = 61;
 }
-
 /**
- * @description:百灵小视频学习函数
- * @param: null
- * @return: null
+ * 
+ * 新百灵视频学习
  */
-function videoStudy_news(tmp) {
-    h = device.height; //屏幕高
-    w = device.width; //屏幕宽
-    x = (w / 3) * 2;
-    h1 = (h / 6) * 5;
-    h2 = (h / 6);
-    //delay(1)
-    if (tmp == 1) {
-        desc("工作").click();
-        delay(2)
-        click("百灵");
-        delay(1)
-    }
-    click("推荐");
-    delay(2);
-    //获取listView视频列表控件用于翻页
-    var v = className('android.widget.FrameLayout').clickable(true).depth(24).findOne().bounds();
-    press(v.centerX(), v.centerY(), 150);
-    delay(1);
-    //var listView = className("ListView"); 
-    for (var i = 0; i < vCount;) {
-        if (textContains("分享").exists()) {
-            console.log("即将学习第" + (i + 1) + "个视频!");
-            video_timing_bailing(i, vTime); //学习每个新闻联播小片段
-            //back();//返回联播频道界面
-            swipe(x, h1, x, h2, 500); // 下滑动
-            delay(1);
-            i++;
-        } else {
-            delay(1);
-            console.error("等待百灵视频界面");
-        }
-    }
-    delay(2);
-    back();
-}
-
 function new_bailing_video(tmp) {
     h = device.height; //屏幕高
     w = device.width; //屏幕宽
@@ -650,9 +680,9 @@ function new_bailing_video(tmp) {
     //delay(1)
     if (tmp == 1) {
         desc("工作").click();
-        delay(2)
-        click("百灵");
         delay(1)
+        click("百灵");
+        delay(0.5)
     }
     for (var i = 0; i < vCount;) {
         if (textContains("百灵").exists()) {
@@ -664,8 +694,8 @@ function new_bailing_video(tmp) {
                 className('android.widget.FrameLayout').clickable(true).depth(22).findOnce((i % 2)).click();
                 console.log("即将学习第" + (i + 1) + "个视频!");
                 video_timing_bailing(i, vTime); //学习每个新闻联播小片段
-                back(); //返回联播频道界面
-                delay(1);
+                back(); //返回
+                delay(0.5);
                 i++;
             } catch (e) {
                 delay(1);
@@ -679,72 +709,8 @@ function new_bailing_video(tmp) {
 
     }
 }
-
-function video_news_time(n, seconds) {
-    var seconds = seconds * 1;
-    seconds = seconds + randomNum(1, 5);
-    for (var i = 0; i < seconds; i++) {
-        sleep(1000);
-        while (!desc("工作").exists()) //如果离开了看电视视频界面则一直等待
-        {
-            console.error("当前已离开第" + (n + 1) + "个视频界面，请重新返回视频");
-            delay(2);
-        }
-        console.info("第" + (n + 1) + "个视频已经观看" + (i + 1) + "秒,剩余" + (seconds - i - 1) + "秒!");
-    }
-}
-
 /**
- * @description:电视台视频学习
- * @param: null
- * @return: null
- */
-function video_news(tmp) {
-    h = device.height; //屏幕高
-    w = device.width; //屏幕宽
-    x = (w / 3) * 2;
-    h1 = (h / 6) * 5;
-    h2 = (h / 6);
-    //delay(1)
-    var t = 6;
-    if (tmp == 1) {
-        desc("工作").click();
-        delay(2);
-        click("电视台");
-        delay(1)
-        click("看电视");
-        delay(2);
-        t = 0;
-    }
-    var s = textContains("中央广播电视总台").depth(22).findOnce().parent();
-    s.click();
-    console.info('改变提示框位置');
-    delay(1);
-    console.setPosition(device.width / 4, -device.height / 4);
-    for (var i = 0; i < vCount; i++) {
-        if (textContains("电视台").exists()) {
-            console.log("即将学习第" + (i + 1) + "个视频!");
-            var cctv = s.parent().parent().parent().parent().child(1).child(0).child(t).bounds();
-            press(cctv.centerX(), cctv.centerY(), 150);
-            delay(2);
-            video_news_time(i, vTime); //学习每个直播小片段
-            delay(1);
-            t++;
-            t = t % 8;
-        } else {
-            delay(1);
-            console.error("等待电视台->看电视界面");
-        }
-    }
-    console.setPosition(0, device.height / 2);
-    delay(2);
-    //back();
-}
-
-/**
- * @description: 听“电台”新闻广播函数  (视听学习+视听学习时长)---6+6=12分
- * @param: null
- * @return: null
+ * 听“电台”新闻广播函数  (视听学习+视听学习时长)---6+6=12分
  */
 function listenToRadio() {
     click("电台");
@@ -770,9 +736,7 @@ function listenToRadio() {
 }
 
 /**
- * @description: 启动app
- * @param: null
- * @return: null
+ * 启动app
  */
 function start_app() {
     console.setPosition(0, device.height / 2); //部分华为手机console有bug请注释本行
@@ -797,36 +761,35 @@ function start_app() {
 }
 
 /**
- * @description: 本地频道
- * @param: null
- * @return: null
+ * 本地频道
  */
 function localChannel() {
-    var i = false;
-    delay(1)
     while (!desc("工作").exists()); //等待加载出主页
-    desc("工作").click();
-    sleep(random_time(delay_time));
     console.log("点击本地频道");
     if (text("思想").exists()) {
         delay(1);
         text("思想").findOne().parent().parent().child(3).click();
-        delay(3);
+        delay(2.7);
         // className("android.support.v7.widget.RecyclerView").findOne().child(2).click();
-        className("android.support.v7.widget.RecyclerView").findOne().children().forEach(child => {
-            if (i) return;
-            var target = child.findOne(className("android.widget.ImageView"));
-            var target_b = target.bounds();
-            console.log(target_b);
-            click(target_b.centerX(), target_b.centerY());
-            i = true;
-        });
-        delay(2);
+        let b = className("android.support.v7.widget.RecyclerView").findOne().child(0).bounds()
+        click(b.centerX(), b.centerY())
+        var i = 0;
+        while (true) {
+            delay(1);
+            let yd = text("已订阅").exists();
+            let dy = text("订阅").exists();
+            if (yd || dy) break;
+            else if (i > 3) {
+                console.error("本地频道进入失败");
+                return
+            }
+            else i++;
+        }
         console.log("返回主界面");
         back();
         launchApp("学习强国");
-        delay(1);
-        text("思想").findOne().parent().parent().child(0).click();
+        //delay(1);
+        //text("思想").findOne().parent().parent().child(0).click();
     } else {
         console.log("请手动点击本地频道！");
     }
@@ -834,9 +797,7 @@ function localChannel() {
 }
 
 /**
- * @description: 获取积分
- * @param: null
- * @return: null
+ * 获取积分
  **/
 function getScores(i) {
     while (!desc("工作").exists()); //等待加载出主页
@@ -909,15 +870,17 @@ function getScores(i) {
         back();
         delay(1);
         return;
-    }
+    }/*
     if (aCount != 0) {
         aCount = aCount;
-    }
+    }*/
     vCount = 6 - myScores["视听学习"];
     rTime = (6 - myScores["视听学习时长"]) * 60;
     asub = 2 - myScores["订阅"];
     // sCount = 2 - myScores["分享"] * 2
     cCount = 1 - myScores["发表观点"];
+    var 专项 = myScores["专项答题"];
+
     if (myScores["每日答题"] < 5) dayCount = 1;
     else dayCount = 0;
     if (myScores["挑战答题"] < 5) tzCount = 1;
@@ -928,7 +891,7 @@ function getScores(i) {
     else doubleCount = 0;
     if (myScores["每周答题"] == 0) meizhou = 1;
     else meizhou = 0;
-    if (myScores["专项答题"] == 0) zhuanxiang = 1;
+    if (专项[1] == 0) zhuanxiang = 1;
     else zhuanxiang = 0;
 
     console.log('评论：' + cCount.toString() + '个')
@@ -941,21 +904,18 @@ function getScores(i) {
     console.log('挑战答题：\t' + tzCount.toString());
     console.log('四人赛：\t' + zsyCount.toString());
     console.log('双人对战：\t' + doubleCount.toString());
-    if (meizhou_txt == "开启")
+    if (meizhou_txt)
         console.log('每周答题：\t' + meizhou.toString());
     console.error("每周答题已不再更新新题！");
-    if (zhuanxiang_txt == "开启")
+    if (zhuanxiang_txt)
         console.log('专项答题：\t' + zhuanxiang.toString());
-
     delay(1);
     back();
     delay(1);
 }
 
 /**
-@description: 停止广播
-@param: null
-@return: null
+ 停止广播
 */
 function stopRadio() {
     console.log("停止收听广播！");
@@ -987,9 +947,7 @@ function stopRadio() {
 }
 
 /**
-@description: 学习平台订阅
-@param: null
-@return: null
+学习平台订阅
 */
 function pic_click(a, b, s1) {
     while (asub > 0) {
@@ -1016,41 +974,48 @@ function sub() {
     desc("工作").click();
     delay(1);
     click("订阅");
-    var d = false;
-    className("android.support.v7.widget.RecyclerView").findOne().children().forEach(child => {
-        if (d) return;
-        var dy = child.findOne(className("android.widget.FrameLayout").depth(25));
-        var dy_b = dy.bounds();
-        console.log(dy_b);
-        click(dy_b.centerX(), dy_b.centerY());
-        d = true;
-    });
-    /*
+    delay(3);
+    if (text("添加").depth(25).exists()) {
+        let b = text("添加").depth(25).findOne().bounds();
+        click(b.centerX(), b.centerY());
+    }
+    else {
+        console.error("添加按钮不存在！");
+        return;
+    }
     h = device.height; //屏幕高
     w = device.width; //屏幕宽
     x = (w / 3) * 2;
     h1 = (h / 6) * 5;
     h2 = (h / 6);
-    delay(1);
-    click("添加");*/
     delay(3);
-    if (!desc('推荐').exists()) {
-        console.info('没有找到，可能你的xxqg不是2.33及以下版本，不支持订阅！！！');
-        back();
-        delay(1);
-        back_table();
-        return 0;
+    if (className("android.view.View").descContains("强国号").exists()) {
+        console.log("已进入订阅页面");
+        if (!desc('推荐').exists()) {
+            console.info('没有找到，可能你的学习强国版本不是2.33及以下版本，不支持订阅！！！');
+            back();
+            delay(1);
+            back_table();
+            return 0;
+        }
+    } else {
+        console.error("进入订阅页面失败！");
+        return;
     }
     var len = desc('推荐').depth(15).findOne().parent();
     var s1 = className("android.view.View").depth(14).scrollable(true).findOne().child(0).child(2).bounds().left;
     var old_names = '';
-    var save_i;
+    if (storage.contains("save_i")) { var save_i = storage.get("save_i") }
+    else { var save_i = 0 };
+    var s_1;
+    // asub = 2
     console.log('搜索中');
-    for (var i = 0; i < len.childCount() - 1 && asub != 0; i++) {
+    for (var i = save_i; i < len.childCount() - 1 && asub != 0; i++) {
         if (订阅 == 'c') i = 1;
-        if (storage.contains("save_i")) i = storage.get("save_i");
-        save_i = i;
+        //  if (storage.contains("save_i")) i = storage.get("save_i");
+        // save_i = i;
         len.child(i).click();
+        s_1 = i;
         delay(1);
         while (true && asub != 0) {
             pic_click(20, 20, s1);
@@ -1076,7 +1041,9 @@ function sub() {
         back();
         delay(1);
         back_table();
-        if (!save_i == null) storage.put("save_i", save_i);
+        console.log(s_1);
+        if (!s_1 == null) s_1 = 0;
+        storage.put("save_i", s_1);
         console.info('订阅完成');
         return 0;
     }
@@ -1117,7 +1084,10 @@ function sub() {
     delay(1);
     back_table();
 }
-
+/**
+ * 
+ * 等待我要答题页面
+ */
 function questionShow() {
     while (!desc("工作").exists()) {
         console.log("等待加载出主页");
@@ -1126,6 +1096,7 @@ function questionShow() {
             return;
         }
     }
+    delay(0.5);
     console.log("当前在主界面")
     if (text("我的").exists()) {
         text("我的").click();
@@ -1139,8 +1110,15 @@ function questionShow() {
     console.log("点击我要答题");
     text("我要答题").findOne().parent().click();
     delay(1);
+    if (className("android.view.View").text("刷新").depth(21).exists()) {
+        console.log("网络不佳，点击刷新");
+        className("android.view.View").text("刷新").depth(21).findOne().click();
+        delay(1);
+    }
 }
-
+/**
+ * 每周答题下滑 即将弃用
+ */
 function meizhouAnswer() {
     h = device.height; //屏幕高
     w = device.width; //屏幕宽
@@ -1150,6 +1128,11 @@ function meizhouAnswer() {
     while (!text("排行榜").exists()) {
         console.info("等待我要答题界面");
         delay(1);
+        if (className("android.view.View").text("刷新").depth(21).exists()) {
+            console.log("网络不佳，点击刷新");
+            className("android.view.View").text("刷新").depth(21).findOne().click();
+            delay(1);
+        }
     }
     var textOrder = text("排行榜").findOnce().parent();
     while (text("排行榜").exists()) {
@@ -1196,6 +1179,9 @@ function meizhouAnswer() {
 
 }
 
+/**
+ * 专项下滑
+ */
 function zhuanxiangAnswer() {
     h = device.height; //屏幕高
     w = device.width; //屏幕宽
@@ -1205,6 +1191,11 @@ function zhuanxiangAnswer() {
     while (!text("排行榜").exists()) {
         console.info("等待我要答题界面");
         delay(1);
+        if (className("android.view.View").text("刷新").depth(21).exists()) {
+            console.log("网络不佳，点击刷新");
+            className("android.view.View").text("刷新").depth(21).findOne().click();
+            delay(1);
+        }
     }
     var textOrder = text("排行榜").findOnce().parent();
     while (text("排行榜").exists()) {
@@ -1257,9 +1248,7 @@ function zhuanxiangAnswer() {
 
 
 /**
- * @description: 获取填空题题目数组
- * @param: null
- * @return: questionArray
+ * 获取填空题题目数组
  */
 function getFitbQuestion() {
     var questionCollections = className("EditText").findOnce().parent().parent();
@@ -1289,7 +1278,6 @@ function getFitbQuestion() {
 
 /**
  * @description: 获取选择题题目数组
- * @param: null
  * @return: questionArray
  */
 function getChoiceQuestion() {
@@ -1301,7 +1289,6 @@ function getChoiceQuestion() {
 
 /**
  * @description: 获取提示字符串
- * @param: null
  * @return: tipsStr
  */
 function getTipsStr() {
@@ -1382,7 +1369,6 @@ function clickByTips(tipsStr) {
 /**
  * @description: 根据答案点击选择题选项
  * @param: answer
- * @return: null
  */
 function clickByAnswer(answer) {
     var click_true = false;
@@ -1445,8 +1431,6 @@ function daily_Answer(question, table_name) {
 }
 /**
  * @description: 每日答题循环
- * @param: null
- * @return: null
  */
 function dailyQuestionLoop() {
     while (true) {
@@ -1602,8 +1586,6 @@ function click_answer(answer) {
 }
 /**
  * @description: 每日答题
- * @param: null
- * @return: null
  */
 function dailyAnswer() {
     while (status) { console.log("主线程暂停中"); sleep(750); };
@@ -1624,19 +1606,29 @@ function dailyAnswer() {
                 s = 0;
                 break;
             }
+            if (className("android.view.View").text("刷新").depth(21).exists()) {
+                console.log("网络不佳，点击刷新");
+                className("android.view.View").text("刷新").depth(21).click();
+                delay(1);
+            }
         }
         if (s == 1) {
             var textOrder = text("排行榜").findOnce().parent();
             while (!className(textOrder.child(2).className()).exists()) {
                 toastLog("等待界面出现");
+                if (className("android.view.View").text("刷新").depth(21).exists()) {
+                    console.log("网络不佳，点击刷新");
+                    className("android.view.View").text("刷新").depth(21).click();
+                    delay(1);
+                }
             }
             textOrder.child(2).click();
         }
     }
     delay(0.5);
     while (true) {
-        delay(2);
         while (status) { console.log("主线程暂停中"); sleep(750); };
+        delay(2);
         dailyQuestionLoop();
         if (text("再练一次").exists()) {
             delay(1.5);
@@ -1683,6 +1675,7 @@ function dailyAnswer() {
  * @return: answer 答案
  */
 function getAnswer(question) {
+    console.log("搜索答案");
     var question1 = question.split('来源：')[0]; //去除来源
     question1 = question1.replace(/ /g, ''); //再删除多余空格
     question1 = question1.replace(/  /g, '');
@@ -1724,8 +1717,9 @@ function challengeQuestionLoop(conNum) {
         let i = random(0, listArray.length - 1);
         console.log("本轮答题数足够，随机点击答案");
         while (status) { console.log("主线程暂停中"); sleep(750); };
+        /*
         var question = className("ListView").findOnce().parent().child(0).text();
-        question = question.replace(/\s/g, "");
+        question = question.replace(/\s/g, "");/*
         var options = []; //选项列表
         if (className("ListView").exists()) {
             className("ListView").findOne().children().forEach(child => {
@@ -1735,12 +1729,12 @@ function challengeQuestionLoop(conNum) {
         } else {
             console.error("答案获取失败!");
             return;
-        }
-        console.log((conNum + 1).toString() + ".随机点击题目：" + question);
+        }*/
+        // console.log((conNum + 1).toString() + ".随机点击题目：" + question);
         delay(random(0.5, 1)); //随机延时0.5-1秒
         listArray[i].child(0).click(); //随意点击一个答案
-        ClickAnswer = listArray[i].child(0).child(1).text();; //记录已点击答案
-        console.log("随机点击:" + ClickAnswer);
+        // ClickAnswer = listArray[i].child(0).child(1).text();; //记录已点击答案
+        // console.log("随机点击:" + ClickAnswer);
         delay(0.5); //等待0.5秒，是否出现X
         console.log("---------------------------");
         return;
@@ -1748,6 +1742,7 @@ function challengeQuestionLoop(conNum) {
     if (className("ListView").exists()) {
         while (status) { console.log("主线程暂停中"); sleep(750); };
         var question = className("ListView").findOnce().parent().child(0).text();
+        console.info("提取题目成功!");
     } else {
         console.error("提取题目失败!");
         let listArray = className("ListView").findOnce().children(); //题目选项列表
@@ -1770,11 +1765,29 @@ function challengeQuestionLoop(conNum) {
             options.push(answer_q);
         });
     } else {
-        console.error("答案获取失败!");
+        console.error("选项获取失败!");
         return;
     }
     console.log((conNum + 1).toString() + ".题目：" + question);
+    reg = /下列..正确的是.*/g;
+    reb = /选择词语的正确.*/g;
+    rea = /选择正确的读音.*/g;
+    if (reg.test(question) || reb.test(question) || rea.test(question)) {
+        // 拼接options
+        var options_str = "";
+        for (var i = 0; i < options.length; i++) {
+            options_str += options[i];
+            if (i != options.length - 1) {
+                options_str += ",";
+            }
+        }
+        console.log("使用选项搜索答案：" + options_str);
+        question = options_str;
+        options_str = null;
+    }
+    console.time("搜索答案");
     var answer = getAnswer(question);
+    console.timeEnd("搜索答案");
     console.info("答案：" + answer);
     if (/^[a-zA-Z]{1}$/.test(answer)) { //如果为ABCD形式
         var indexAnsTiku = indexFromChar(answer.toUpperCase());
@@ -2047,18 +2060,25 @@ function do_contest_answer(depth_option, question1) {
             while (status) { console.log("主线程暂停中"); sleep(750); };
             var b = className('ListView').depth(29).findOne(3000).bounds();
             img = images.clip(img, b.left, b.top, b.right - b.left, b.bottom - b.top);
-            if (ocr_model == 1) {
-                old_question = easyedge_ocr_api(img);
-            } else if (ocr_model == 2) {
-                old_question = ocr_api(img);
-            } else if (ocr_model == 0) {
-                old_question = paddle_ocr_api(img);
-            } else {
-                console.error("配置异常!");
-                exit();
+            console.time('文字识别');
+            switch (ocr_model) {
+                case 0:
+                    console.log('\n使用飞浆OCR');
+                    old_question = ocr_api.fj(img);
+                    break;
+                case 1:
+                    console.log('\n使用外置OCR');
+                    old_question = ocr_api.ww(img);
+                    break;
+                case 2:
+                    console.log('\n使用浩然OCR');
+                    old_question = ocr_api.hr(img);
+                    break;
             }
-            console.log('选项: ' + old_question);
-            var question = old_old_question + old_question;
+            console.timeEnd('文字识别');
+            if (old_question != null) console.log('选项: ' + old_question);
+            else { console.log('识别失败'); exit(); }
+            question = old_old_question + old_question;
             if (debug) console.log('合并后：' + question);
         } catch (e) {
             console.error(e);
@@ -2128,16 +2148,24 @@ function do_contest_answer(depth_option, question1) {
                 var img = captureScreen();
                 var b = className('ListView').depth(29).findOne(3000).bounds();
                 img = images.clip(img, b.left, b.top, b.right - b.left, b.bottom - b.top);
-                if (ocr_model == 1) {
-                    old_question = easyedge_ocr_api(img);
-                } else if (ocr_model == 2) {
-                    old_question = ocr_api(img);
-                } else if (ocr_model == 0) {
-                    old_question = paddle_ocr_api(img);
-                } else {
-                    console.error("配置异常!");
-                    exit();
+                console.time('文字识别');
+                switch (ocr_model) {
+                    case 0:
+                        console.log('\n使用飞浆OCR');
+                        old_question = ocr_api.fj(img);
+                        break;
+                    case 1:
+                        console.log('\n使用外置OCR');
+                        old_question = ocr_api.ww(img);
+                        break;
+                    case 2:
+                        console.log('\n使用浩然OCR');
+                        old_question = ocr_api.hr(img);
+                        break;
                 }
+                console.timeEnd('文字识别');
+                if (old_question != null) console.log(old_question);
+                else { console.log('识别失败'); exit(); }
             } catch (e) {
                 console.error(e);
                 console.info('选项获取失败');
@@ -2293,120 +2321,41 @@ function similarity(question, answer, q, flag) {
 }
 
 /**
- * 点击对应的去答题或去看看
- * @param {image} img 传入图片,本地。
- */
-function ocr_api(img) {
-    console.log('第三方本地ocr文字识别中');
-    try {
-        var answer = "";
-        var results = ocr.detect(img.getBitmap(), 1);
-        for (var i = 0; i < results.size(); i++) {
-            var s = results.get(i).text;
-            answer += s;
-            // 提取图片中的文字
-        }
-        // console.info(answer.replace(/\s*/g, ""));
-        return answer.replace(/\s*/g, "");
-    } catch (e) {
-        console.error(e);
-        console.info("第三方OCR插件安装错了位数，分为64位和32位\n卸载之前的插件，换一个位数安装");
-        exit();
-    }
-}
-
-function paddle_ocr_api(img) {
-    console.log('内置飞浆文字识别中');
-    let cpuThreadNum = 8;
-    let useSlim = true;
-    if (cpuThreadNum == null || useSlim == null) {
-        var OCR_Result = paddle.ocrText(img);
-    } else {
-        var OCR_Result = paddle.ocrText(img, cpuThreadNum, useSlim);
-    }
-    OCR_Result = JSON.stringify(OCR_Result);
-    var len_OCR = OCR_Result.length - 2
-    var str_OCR = [];
-    for (var i = 2; i < len_OCR; i++) {
-        str_OCR += OCR_Result[i];
-    }
-    return str_OCR.replace(/","/gi, "");
-}
-
-// 百度easyedge
-function easyedge_ocr_api(img) {
-    console.log('EasyEdge OCR文字识别中');
-    var img_scale = images.scale(img, 0.25, 0.25); // 将图片缩放为原来的一半
-    var Base64_img = images.toBase64(img_scale, 'jpeg', 50);
-    //	var easyedge_ocr_url = hamibot.env.easyedge_ocr_url;
-    r = http.postJson(easyedge_ocr_url, {
-        action: 'ocr',
-        imgPath: Base64_img,
-    }
-        /* , {
-            headers: {
-                'Content-Type': 'text/plain;charset=utf8',
-                'Connection': 'Keep-Alive',
-                'Accept-Encoding': 'gzip, deflate'
-            },
-            } */
-    );
-    /* 	r = http.postJson(easyedge_ocr_url, {
-            action: 'ocr',
-            imgPath: text,
-        }); */
-    let obj = r.body.json();
-    /*
-        threads.start(function() {
-            img_scale.recycle();
-            var r = null, Base64_img = null;
-        });*/
-    return obj.result;
-}
-
-/**
  * @description: 加载题库和加载替换
  * @param: null
  * @return: null
  */
 function init() {
-    if (files.exists('/sdcard/科技!解放!/question.txt')) {
-        tikus = files.read('/sdcard/科技!解放!/question.txt', encoding = "utf-8");
-        tikus = tikus.split('\n');
-        for (var i = 0; i < tikus.length; i++) {
-            var t = tikus[i].split(' ');
-            if (t[1] && t[0]) {
-                var answer = '';
-                for (var j = 2; j < t.length; j++) { // 可能tiku答案有空格，但是被切割了
-                    answer += t[j];
-                }
-                question_list.push([t[1], t[0], answer]);
+    console.log('加载题库');
+    tikus = files.read('/sdcard/科技!解放!/question.txt', encoding = "utf-8");
+    tikus = tikus.split('\n');
+    for (var i = 0; i < tikus.length; i++) {
+        var t = tikus[i].split(' ');
+        if (t[1] && t[0]) {
+            var answer = '';
+            for (var j = 2; j < t.length; j++) { // 可能tiku答案有空格，但是被切割了
+                answer += t[j];
             }
+            question_list.push([t[1], t[0], answer]);
         }
-        answer = null;
-        tikus = null;
-        init_true = true;
-        if (question_list.length < 1000) {
-            console.info('四人/双人/挑战题库崩了！！！，等！！！');
-            exit();
-        }
-        init_true = true;
-    } else if (!files.exists('/sdcard/科技!解放!/question.txt')) {
-        console.error('手机根目录下未找到question.txt （路径： /sdcard/科技!解放!/question.txt）');
-        exit();
-    } else {
-        console.error('未知错误！！！');
+    }
+    answer = null;
+    tikus = null;
+    init_true = true;
+    if (question_list.length < 1000) {
+        console.info('四人/双人/挑战题库崩了！！！，等！！！');
         exit();
     }
+    init_true = true;
 }
 
+
+// var xxx = false;
 /**
  * @description: 四人赛
  * @param: null
  * @return: null
  */
-var xxx = false;
-
 function zsyAnswer() {
     if (first_com_no) {
         console.info('已开启首轮不答');
@@ -2438,13 +2387,14 @@ function zsyAnswer() {
         className("ListView").waitFor();
         console.info('等待比赛结束');
         while (!text('继续挑战').exists()) {
-            sleep(5000);
+            sleep(500);
+            device.wakeUp()
         }
         console.info('比赛结束');
         delay(1);
         text('继续挑战').click();
         delay(3);
-        var j = text("开始比赛").findOne(5000);
+        let j = text("开始比赛").findOne(5000);
         if (j = null) {
             console.error('不在竞赛页面，停止脚本');
             exit();
@@ -2463,16 +2413,24 @@ function zsyAnswer() {
         console.error(e);
         exit();
     }
-    if (ocr_model == 2) {
-        ocr_api(img);
-    } else if (ocr_model == 1) {
-        question = easyedge_ocr_api(img);
-    } else if (ocr_model == 0) {
-        paddle_ocr_api(img);
-    } else {
-        console.error("配置异常!");
-        exit();
+    console.time('文字识别');
+    switch (ocr_model) {
+        case 0:
+            console.log('\n使用飞浆OCR');
+            ocr = ocr_api.fj(img);
+            break;
+        case 1:
+            console.log('\n使用外置OCR');
+            ocr = ocr_api.ww(img);
+            break;
+        case 2:
+            console.log('\n使用浩然OCR');
+            ocr = ocr_api.hr(img);
+            break;
     }
+    console.timeEnd('文字识别');
+    if (ocr != null) console.log(ocr);
+    else { console.log('识别失败'); exit(); }
     var count = 2;
     console.info('改变提示框位置');
     console.setPosition(device.width / 10, -device.height / 8);
@@ -2515,7 +2473,6 @@ function zsyAnswer() {
         console.log('坐标获取完成');
         //if (debug) console.log(cix + "，" + ciy + "，" + cidx + "，" + cidy);
         while (!text('继续挑战').exists()) {
-            // if (className('android.widget.Image').depth(23).waitFor()) break;
             do {
                 img = captureScreen();
                 var point = findColor(img, '#1B1F25', {
@@ -2540,16 +2497,25 @@ function zsyAnswer() {
                 break100 = true;
                 break;
             }
-            if (ocr_model == 2) {
-                question = ocr_api(img);
-            } else if (ocr_model == 1) {
-                question = easyedge_ocr_api(img);
-            } else if (ocr_model == 0) {
-                question = paddle_ocr_api(img);
-            } else {
-                console.error("配置异常!");
-                exit();
+            console.time('文字识别');
+            switch (ocr_model) {
+                case 0:
+                    console.log('\n使用飞浆OCR');
+                    question = ocr_api.fj(img);
+                    break;
+                case 1:
+                    console.log('\n使用外置OCR');
+                    question = ocr_api.ww(img);
+                    break;
+                case 2:
+                    console.log('\n使用浩然OCR');
+                    question = ocr_api.hr(img);
+                    break;
             }
+            console.timeEnd('文字识别');
+            if (question != null) console.log("OCR TXT : \n" + question);
+            else { console.log('识别失败'); exit(); }
+
             question = question.slice(question.indexOf('.') + 1);
             question = question.replace(/,/g, "，");
             console.log('OCR识别出的题目：' + question);
@@ -2572,7 +2538,6 @@ function zsyAnswer() {
             }
             console.timeEnd('答题');
             // 根据选项颜色判断是否答错
-            img.recycle(); // 回收
             while (status) { console.log("主线程暂停中"); sleep(750); };
             do {
                 var point = findColor(captureScreen(), '#555AB6', {
@@ -2600,6 +2565,7 @@ function zsyAnswer() {
                 }
             }
             console.log('等待下一题\n----------');
+            img.recycle(); // 回收
         }
         // 四人
         if (i == 0 && count == 2) {
@@ -2674,31 +2640,44 @@ var ta = 2000 * 1;
 if (!ta || ta <= 0) ta = 1500;
 var thread = null;
 
+/**
+ * 开始运行
+ */
 function rt() {
     var num = 0;
     while (true) {
         num++;
         console.log('设置脚本运行最长时间为：' + ta + 's');
         device.keepScreenOn(ta * 1000 + 60000);
-        thread = threads.start(function () {
-            sleep(ta * 1000);
+        setTimeout(() => {
             console.log('脚本运行时间已达到' + ta + 's，自动退出');
             engines.stopAllAndToast();
             threads.shutDownAll();
-        })
+        }, ta * 1000);
         try {
-            rand_mode();
+            var r = rand_mode();
         }
         catch (e) {
-            console.error('脚本超时或者出错！！！，可能会重启脚本');
-            if (!(launchApp("学习强国") || launch('cn.xuexi.android'))) //启动学习强国app
-                console.info('等待10s后继续开始');
-            toast('等待10s后继续开始');
-            delay(10);
-            back_table();
-            toast(' ');
-            delay(1);
-            if (num > 3) break;
+            if (!r) {
+                console.error(e.message);
+                console.error('脚本可能超时或者出错！！！，可能会重启脚本');
+                exit();
+                /*
+                if (!(launchApp("学习强国") || launch('cn.xuexi.android'))) //启动学习强国app
+                    console.info('等待10s后继续开始');
+                toast('等待10s后继续开始');
+                delay(10);
+                back_table();
+                toast(' ');
+                delay(1);
+                if (num > 3) break;*/
+            }
+        }
+        finally {
+            if (thread) thread.interrupt();
+            thread = null;
+            device.cancelKeepingAwake();
+            if (r) exit();
         }
     }
     console.error('已经重新运行了3轮，停止脚本');
@@ -2760,14 +2739,8 @@ function back_table() {
     // home();  //回到桌面
 }
 
-function rand_mode() {
-    start_app(); //启动app
-    // 四人();    
-    var start = new Date().getTime(); //程序开始时间
-    getScores(0); //获取积分
-    re_store();
-
-    var arr = [0, 1, 2, 3, 4];
+function 答题() {
+    var arr = [0, 1, 2, 3, 4, 5];
     var t;
     for (var i = 0; i < arr.length; i++) {
         var rand = parseInt(Math.random() * arr.length);
@@ -2776,25 +2749,64 @@ function rand_mode() {
         arr[i] = t;
     }
 
-    var arr_1 = [0, 1, 2, 3, 4, 5];
-    var t_1;
     for (var i = 0; i < arr.length; i++) {
-        var rand_1 = parseInt(Math.random() * arr_1.length);
-        t_1 = arr_1[rand_1];
-        arr_1[rand_1] = arr[i_1];
-        arr_1[i] = t_1;
+        if (arr[i] == 0) 专项();
+        else if (arr[i] == 1) 每周();
+        else if (arr[i] == 2) 挑战();
+        else if (arr[i] == 3) 双人();
+        else if (arr[i] == 4) 每日();
+        else if (arr[i] == 5) 四人();
     }
+
+}
+
+function arr_random(arr) {
+    var t;
+    for (var i = 0; i < arr.length; i++) {
+        var rand = parseInt(Math.random() * arr.length);
+        t = arr[rand];
+        arr[rand] = arr[i];
+        arr[i] = t;
+    }
+    console.info('打印学习顺序')
+    arr.forEach(function (item) {
+        switch (item) {
+            case 0:
+                console.log('本地频道');
+                break;
+            case 1:
+                console.log('视频学习');
+                break;
+            case 2:
+                console.log('订阅');
+                break;
+            case 3:
+                console.log('文章和广播');
+                break;
+            case 4:
+                console.log('答题');
+                break;
+        }
+    }
+    );
+    return arr
+}
+
+function rand_mode() {
+    var arr = [0, 1, 2, 3, 4];
+    console.verbose('异步生成学习顺序')
+    threads.start(function () {
+        arr = arr_random(arr);
+    });
+    start_app(); //启动app
+    // 四人();    
+    var start = new Date().getTime(); //程序开始时间
+    getScores(0); //获取积分
+    re_store();
 
     for (var i = 0; i < arr.length; i++) {
         if (arr[i] == 0) {
-            for (var i = 0; i < arr_1.length; i++) {
-                if (arr_1 == 0) 专项();
-                if (arr_1 == 1) 每周();
-                if (arr_1 == 2) 挑战();
-                if (arr_1 == 3) 双人();
-                if (arr_1 == 4) 每日();
-                if (arr_1 == 5) 四人();
-            }
+            本地();
         } else if (arr[i] == 1) {
             视频学习();
         } else if (arr[i] == 2) {
@@ -2802,7 +2814,7 @@ function rand_mode() {
         } else if (arr[i] == 3) {
             文章和广播();
         } else if (arr[i] == 4) {
-            本地();
+            答题();
         }
     }
 
@@ -2827,11 +2839,11 @@ function rand_mode() {
     delay(3);
     console.hide();
     device.cancelKeepingAwake();
-    exit();
+    return true;
 }
 
 function 专项() {
-    if (zhuanxiang_txt == true && zhuanxiang != 0) {
+    if (zhuanxiang_txt && zhuanxiang != 0) {
         console.info('开始专项答题');
         delay(1);
         if (!text("排行榜").exists()) {
@@ -2845,7 +2857,7 @@ function 专项() {
 }
 
 function 每周() {
-    if (meizhou_txt == true && meizhou != 0) {
+    if (meizhou_txt && meizhou != 0) {
         console.error("每周答题已不再更新新题！");
         console.info('开始每周答题');
         delay(1);
@@ -2860,7 +2872,7 @@ function 每周() {
 }
 
 function 双人() {
-    if (doubleCount != 0 && shuangren == true) {
+    if (doubleCount != 0 && shuangren) {
         console.info('开始双人答题');
         delay(2);
         if (!text("排行榜").exists()) {
@@ -2886,7 +2898,7 @@ function 双人() {
 }
 
 function 四人() {
-    if (zsyCount != 0 && siren == true) {
+    if (zsyCount != 0 && siren) {
         // delay(2);
         console.info('开始四人答题');
         delay(2);
@@ -2915,8 +2927,7 @@ function 四人() {
 }
 
 function 挑战() {
-    //tzCount = 1;
-    if ((tzCount != 0 || 点点通['挑战答题']) && tiaozhan == true) {
+    if ((tzCount != 0 || 点点通['挑战答题']) && tiaozhan) {
         news = false;
         console.info('开始挑战答题');
         if (!text("排行榜").exists()) {
@@ -2932,7 +2943,7 @@ function 挑战() {
 
 function 每日() {
     // dayCount = 1;
-    if (dayCount != 0 && meiri == true) {
+    if (dayCount != 0 && meiri) {
         console.info('开始每日答题');
         if (!text("排行榜").exists()) {
             console.info("进入我要答题");
@@ -2946,7 +2957,6 @@ function 每日() {
 }
 
 function 视频学习() {
-    var x = 1;
     if (text("排行榜").exists()) {
         delay(0.5);
         back();
@@ -2965,15 +2975,18 @@ function 视频学习() {
         }
         delay(2);
     }
-    while ((vCount != 0 || 点点通['有效视听']) && video != 'a') {
+    while ((vCount != 0 || 点点通['有效视听']) && video) {
+        var x = 1;
         if (点点通['有效视听'])
             vCount = Math.max(点点通['有效视听'] * 6 - (6 - vCount), 点点通['有效视听'] * 6);
-        console.error('当前第' + x + '次看视频');
+        console.info('当前第' + x + '次看视频');
+        /*
         if (video == 'b')
             videoStudy_news(x); //看视频
         else if (video == 'a')
             video_news(x); //电视台
-        else new_bailing_video(x); // 新百灵
+        else */
+        new_bailing_video(x); // 新百灵
         console.info("等待3秒，然后确认视频是否已满分。");
         delay(3);
         getScores(2);
@@ -2987,8 +3000,8 @@ function 视频学习() {
 }
 
 function 本地() {
-    if (myScores['本地频道'] != 1 && loca == true) {
-        //if (true) {
+    if (myScores['本地频道'] != 1 && loca) {
+        // if (true) {
         console.info('开始本地频道');
         if (text("排行榜").exists()) {
             delay(0.5);
@@ -3013,8 +3026,8 @@ function 本地() {
 }
 
 function 订() {
-    // if (订阅 != 'a' && asub != 0) {
-    if (true) {
+    if (订阅 && asub != 0) {
+        //if (true) {
         if (text("排行榜").exists()) {
             delay(0.5);
             back();
@@ -3057,7 +3070,7 @@ function 文章和广播() {
         }
         delay(2);
     }
-    if (rTime != 0 && articles == true) {
+    if (rTime != 0 && articles) {
         listenToRadio(); //听电台广播
         h = device.height; //屏幕高
         w = device.width; //屏幕宽
@@ -3069,19 +3082,19 @@ function 文章和广播() {
     }
     var r_start = new Date().getTime(); //广播开始时间
     var x = 0;
-    while ((aCount != 0 || 点点通['有效浏览']) && articles == true) {
+    while ((aCount != 0 || 点点通['有效浏览']) && articles) {
         aTime = 61;
         articleStudy(x); //学习文章，包含点赞、分享和评论
         console.info("等待3秒，然后确认文章是否已满分。");
         delay(3);
         getScores(1);
         x++;
-        if (x > 2) { //尝试三次
-            console.info("尝试3次未满分，暂时跳过。");
+        if (x > 1) { //尝试2次
+            console.info("尝试2次未满分，暂时跳过。");
             break;
         }
     }
-    if (articles == true) {
+    if (articles) {
         var end = new Date().getTime(); //广播结束时间
         var radio_time = (parseInt((end - r_start) / 1000)); //广播已经收听的时间
         radio_timing(parseInt((end - r_start) / 1000), rTime - radio_time); //广播剩余需收听时间
