@@ -1,5 +1,5 @@
 ### 科技!解放!
-- 基于[Study_hamibot](https://github.com/wangwang-code/Study_hamibot)魔改
+- 基于[Study_hamibot](https://github.com/wangwang-code/Study_hamibot)魔改 在[AutoX](https://github.com/wangwang-code/AutoX)运行
 
 ## 免责声明
 
