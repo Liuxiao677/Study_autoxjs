@@ -1,7 +1,7 @@
 var ocr_api = {};
 // 外置
 ocr_api.ww = function (img) {
-    img = images.scale(img, 0.4, 0.4); // 将图片缩放为原来的一半
+    
     var Base64_img = images.toBase64(img, 'jpeg', 55);
     console.log('外置OCR文字识别中');
     try {
@@ -17,7 +17,7 @@ ocr_api.ww = function (img) {
         let buffReader = java.io.BufferedReader(java.io.InputStreamReader(input, "utf-8"))
         let message = buffReader.readLine()
         if (message != null) {
-            log("外置OCR识别出来的文本 " + message)
+            // log("外置OCR识别出来的文本 " + message)
             ps.close()
             buffReader.close()
             socket.close()
@@ -56,13 +56,19 @@ ocr_api.hr = function (img) {
 };
 // 飞浆
 ocr_api.fj = function (img) {
-    console.time("压缩")
-    img = images.scale(img, 0.4, 0.4); // 将图片缩放为原来的一半
-    console.timeEnd("压缩")
+    var txt
     console.log('内置飞浆文字识别中');
     try {
         // var txt = paddle.ocrText(img, 8, "/sdcard/科技!解放!/ocr_v2_for_cpu(slim)/").join("")
-        var txt = paddle.ocrText(img, 8, true).join("")
+        var thread = new java.lang.Thread(function () {
+            img = images.scale(img, 0.4, 0.4); // 将图片缩放为原来的一半
+            txt = paddle.ocrText(img, 8, true).join("")
+            //exit()
+            return txt
+        });
+        thread.setPriority(10)
+        thread.start()
+        thread.join()
     } catch (e) {
         console.error(e);
     }
